@@ -1,6 +1,6 @@
 __all__ = ['blender', 'loader']     # , 'deepvoxels', 'llff']
 
-from input_data import loader
-from input_data import blender
-# from input_data import llff
-# from input_data import deepvoxels
+from dataio import loader
+from dataio import blender
+# from dataio import llff
+# from dataio import deepvoxels

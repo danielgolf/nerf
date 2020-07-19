@@ -23,8 +23,8 @@ def setup_dirs(cfg):
 def fix_seed(seed):
     if seed is not None:
         print('Fixing random seed', seed)
-        torch.manual_seed(seed)
         np.random.seed(seed)
+        torch.manual_seed(seed)
 
 
 def main(cfg):

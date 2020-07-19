@@ -6,32 +6,33 @@ from PIL import Image
 
 import torchvision.transforms.functional as TF
 
-trans_t = lambda t: np.array([
-    [1, 0, 0, 0],
-    [0, 1, 0, 0],
-    [0, 0, 1, t],
-    [0, 0, 0, 1],
-], dtype=np.float32)
 
-rot_phi = lambda phi: np.array([
-    [1, 0, 0, 0],
-    [0, np.cos(phi), -np.sin(phi), 0],
-    [0, np.sin(phi), np.cos(phi), 0],
-    [0, 0, 0, 1],
-], dtype=np.float32)
+def translate_along_z(t):
+    tform = np.eye(4).astype(np.float32)
+    tform[2][3] = t
+    return tform
 
-rot_theta = lambda th: np.array([
-    [np.cos(th), 0, -np.sin(th), 0],
-    [0, 1, 0, 0],
-    [np.sin(th), 0, np.cos(th), 0],
-    [0, 0, 0, 1],
-], dtype=np.float32)
+
+def rotate_along_x(phi=np.pi):
+    tform = np.eye(4).astype(np.float32)
+    tform[1, 1] = tform[2, 2] = np.cos(phi)
+    tform[1, 2] = np.sin(phi)
+    tform[2, 1] = -tform[1, 2]
+    return tform
+
+
+def rotate_along_y(theta=np.pi):
+    tform = np.eye(4).astype(np.float32)
+    tform[0, 0] = tform[2, 2] = np.cos(theta)
+    tform[0, 2] = np.sin(theta)
+    tform[2, 0] = -tform[0, 2]
+    return tform
 
 
 def pose_spherical(theta, phi, radius):
-    c2w = trans_t(radius)
-    c2w = rot_phi(phi / 180. * np.pi) @ c2w
-    c2w = rot_theta(theta / 180. * np.pi) @ c2w
+    c2w = translate_along_z(radius)
+    c2w = rotate_along_x(phi * np.pi / 180.0) @ c2w
+    c2w = rotate_along_y(theta * np.pi / 180.0)  @ c2w
     c2w = np.array([
         [-1, 0, 0, 0],
         [0, 0, 1, 0],
@@ -41,31 +42,25 @@ def pose_spherical(theta, phi, radius):
     return c2w
 
 
-def load(datadir, half_res=False, testskip=1):
-    splits = ['train', 'val', 'test']
-    metas = {}
-    for s in splits:
-        fname = os.path.join(datadir, 'transforms_{}.json'.format(s))
-        with open(fname, 'r') as fp:
-            metas[s] = json.load(fp)
-
+def load(cfg):
     all_imgs = []
     all_poses = []
     counts = [0]
-    for s in splits:
-        meta = metas[s]
+    for s in ['train', 'val', 'test']:
+        meta = None
+        fname = os.path.join(cfg.dataset.basedir, 'transforms_{}.json'.format(s))
+        with open(fname, 'r') as fp:
+            meta = json.load(fp)
+
         imgs = []
         poses = []
-        if s == 'train' or testskip == 0:
-            skip = 1
-        else:
-            skip = testskip
+        skip = 1 if s == 'train' or cfg.dataset.testskip < 1 else cfg.dataset.testskip
 
         for frame in meta['frames'][::skip]:
-            fname = os.path.join(datadir, frame['file_path'] + '.png')
+            fname = os.path.join(cfg.dataset.basedir, frame['file_path'] + '.png')
 
             im = Image.open(fname)
-            if half_res:
+            if cfg.dataset.half_res:
                 im = TF.resize(im, (400, 400))
             imgs.append(np.array(im))
 
@@ -87,6 +82,14 @@ def load(datadir, half_res=False, testskip=1):
     camera_angle_x = float(meta['camera_angle_x'])
     focal = .5 * W / np.tan(.5 * camera_angle_x)
 
-    render_poses = np.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180, 180, 40 + 1)[:-1]], axis=0)
+    render_poses = np.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180, 180, 40, endpoint=False)], axis=0)
 
-    return imgs, poses, render_poses, [int(H), int(W), focal], i_split
+    if cfg.nerf.train.white_background:
+        imgs = imgs[..., :3] * imgs[..., -1:] + (1. - imgs[..., -1:])
+    else:
+        imgs = imgs[..., :3]
+
+    hwf = [int(H), int(W), focal]
+
+    print('Loaded blender', imgs.shape, poses.shape, render_poses.shape, hwf, cfg.dataset.basedir)
+    return imgs, poses, render_poses, i_split, hwf
