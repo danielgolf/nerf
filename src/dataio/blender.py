@@ -48,16 +48,19 @@ def load(cfg):
     counts = [0]
     for s in ['train', 'val', 'test']:
         meta = None
-        fname = os.path.join(cfg.dataset.basedir, 'transforms_{}.json'.format(s))
+        fname = os.path.join(cfg.dataset.path, 'transforms_{}.json'.format(s))
         with open(fname, 'r') as fp:
             meta = json.load(fp)
 
         imgs = []
         poses = []
-        skip = 1 if s == 'train' or cfg.dataset.testskip < 1 else cfg.dataset.testskip
+        if s == 'train' or cfg.dataset.testskip < 2:
+            skip = 1
+        else:
+            skip = cfg.dataset.testskip
 
         for frame in meta['frames'][::skip]:
-            fname = os.path.join(cfg.dataset.basedir, frame['file_path'] + '.png')
+            fname = os.path.join(cfg.dataset.path, frame['file_path'] + '.png')
 
             im = Image.open(fname)
             if cfg.dataset.half_res:
@@ -82,14 +85,24 @@ def load(cfg):
     camera_angle_x = float(meta['camera_angle_x'])
     focal = .5 * W / np.tan(.5 * camera_angle_x)
 
-    render_poses = np.stack([pose_spherical(angle, -30.0, 4.0) for angle in np.linspace(-180, 180, 40, endpoint=False)], axis=0)
+    render_poses = np.stack([
+        pose_spherical(angle, -30.0, 4.0)
+        for angle in np.linspace(-180, 180, 40, endpoint=False)
+    ], axis=0)
 
-    if cfg.nerf.train.white_background:
+    if cfg.dataset.white_background:
         imgs = imgs[..., :3] * imgs[..., -1:] + (1. - imgs[..., -1:])
     else:
         imgs = imgs[..., :3]
 
     hwf = [int(H), int(W), focal]
 
-    print('Loaded blender', imgs.shape, poses.shape, render_poses.shape, hwf, cfg.dataset.basedir)
+    print(
+        'Loaded blender',
+        cfg.dataset.path,
+        imgs.shape,
+        poses.shape,
+        render_poses.shape,
+        hwf
+    )
     return imgs, poses, render_poses, i_split, hwf

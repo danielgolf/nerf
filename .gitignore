@@ -3,6 +3,7 @@ __pycache__/
 .vscode/
 data/
 logs/
+test.*
 *.png
 *.mp4
 *.npy

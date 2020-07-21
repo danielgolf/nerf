@@ -26,7 +26,10 @@ class Config(dict):
         if name in self:
             return self[name]
         else:
-            return None
+            # TODO: change back, but for now make sure that all
+            # attributes used are in the config file
+            raise AttributeError("No such attribute: " + name)
+            # return None
 
     def __setattr__(self, name, value):
         self[name] = value
