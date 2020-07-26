@@ -2,6 +2,7 @@ import os
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.utils import tensorboard
 
 
 class Embedder:
@@ -59,27 +60,26 @@ class NerfMLP(nn.Module):
         self.skips = skips if isinstance(skips, list) else []
         self.fc_base_list = nn.ModuleList()
 
+        in_size = self.dim_xyz
         for i in range(num_layers):
             if i in self.skips:
-                self.fc_base_list.append(
-                    nn.Linear(num_neurons + self.dim_xyz, num_neurons)
-                )
-            else:
-                self.fc_base_list.append(
-                    nn.Linear(num_neurons, num_neurons)
-                )
+                in_size += self.dim_xyz
+            self.fc_base_list.append(
+                nn.Linear(in_size, num_neurons)
+            )
+            in_size = num_neurons
 
         if dim_dir is not None:
             self.fc_alpha = nn.Linear(num_neurons, 1)
             self.fc_feat = nn.Linear(num_neurons, num_neurons)
-            self.fc_last = nn.Linear(num_neurons + dim_dir, num_neurons // 2)
+            self.fc_last = nn.Linear(num_neurons + self.dim_dir, num_neurons // 2)
             self.fc_rgb = nn.Linear(num_neurons // 2, 3)
         else:
             self.fc_out = nn.Linear(num_neurons, 4)
 
     def forward(self, x):
         x_xyz = x[..., :self.dim_xyz]
-        x_dir = None if self.dim_dir is None else x[..., self.dim_dir:]
+        x_dir = None if self.dim_dir is None else x[..., self.dim_xyz:]
 
         x = x_xyz
         for i in range(len(self.fc_base_list)):
@@ -102,7 +102,6 @@ class NerfMLP(nn.Module):
 
 class Nerf():
     def __init__(self, cfg):
-        # TODO: define device
         self.embed_xyz_coarse, self.embed_dir_coarse = None, None
         self.dim_xyz_coarse, self.dim_dir_coarse = None, None
         self.embed_xyz_fine, self.embed_dir_fine = None, None
@@ -126,18 +125,19 @@ class Nerf():
             skips=cfg.model.fine.skip_connections
         ) if cfg.model.fine is not None else None
 
-        self.opt_coarse, self.opt_fine = None, None
-        self._create_optimizers(cfg)
+        self._create_optimizer(cfg)
 
-        self.save_path = os.path.join(
+        self.log_path = os.path.join(
             cfg.experiment.logdir,
-            cfg.experiment.id,
+            cfg.experiment.id
+        )
+        self.checkpoint_path = os.path.join(
+            self.log_path,
             'checkpoint.pt'
         )
-
+        self.writer = tensorboard.writer.SummaryWriter(self.log_path)
+        self.iter = 0
         print('Model loaded.')
-
-        # TODO run network function with embeddings
 
     def _create_embeddings(self, cfg):
         periodic_fns = [torch.sin, torch.cos]
@@ -157,8 +157,7 @@ class Nerf():
                 cfg.model.coarse.include_input_dir
             )
             self.embed_dir_coarse = lambda x, emb=e: emb.embed(x)
-            # TODO: why also 3 here? direction is 2D
-            self.dim_dir_coarse =  3 * e.num_fns
+            self.dim_dir_coarse = 3 * e.num_fns
 
         if cfg.model.fine is None:
             return
@@ -178,43 +177,50 @@ class Nerf():
                 cfg.model.fine.include_input_dir
             )
             self.embed_dir_fine = lambda x, emb=e: emb.embed(x)
-            # TODO: why also 3 here? direction is 2D
             self.dim_dir_fine = 3 * e.num_fns
 
-    def _create_optimizers(self, cfg):
-        # TODO
-        self.opt_coarse = torch.optim.Adam(self.model_coarse.parameters(), 0.001)
+    def _create_optimizer(self, cfg):
+        # TODO exponential decay
+        params = list(self.model_coarse.parameters())
         if self.model_fine is not None:
-            self.opt_fine = torch.optim.Adam(self.model_fine.parameters(), 0.001)
+            params += list(self.model_fine.parameters())
+
+        self.opt = getattr(torch.optim, cfg.train.optimizer.type)(
+            self.model_coarse.parameters(),
+            cfg.train.optimizer.lr
+        )
 
     def load(self):
-        if not os.path.isfile(self.save_path):
+        if not os.path.isfile(self.checkpoint_path):
             print('No checkpoint found.')
             return
 
-        checkpoint = torch.load(self.save_path)
+        checkpoint = torch.load(self.checkpoint_path)
         self.model_coarse.load_state_dict(checkpoint['model_coarse'])
-        self.opt_coarse.load_state_dict(checkpoint['opt_coarse'])
-        if (checkpoint['model_fine'] is not None
-                and checkpoint['opt_fine'] is not None):
+        if checkpoint['model_fine'] is not None:
             self.model_fine.load_state_dict(checkpoint['model_fine'])
-            self.opt_fine.load_state_dict(checkpoint['opt_fine'])
+        self.opt.load_state_dict(checkpoint['opt'])
+        self.iter = checkpoint['iter']
 
     def save(self):
         checkpoint = {
             'model_coarse': self.model_coarse.state_dict(),
-            'opt_coarse': self.opt_coarse.state_dict(),
+            'opt': self.opt.state_dict(),
+            'iter': self.iter
         }
         if self.model_fine is None:
             checkpoint['model_fine'] = None
-            checkpoint['opt_fine'] = None
         else:
             checkpoint['model_fine'] = self.model_fine.state_dict()
-            checkpoint['opt_fine'] = self.opt_fine.state_dict()
 
-        torch.save(checkpoint, self.save_path)
+        torch.save(checkpoint, self.checkpoint_path)
 
     def to(self, device):
         self.model_coarse.to(device)
         if self.model_fine is not None:
             self.model_fine.to(device)
+
+    def train(self):
+        self.model_coarse.train()
+        if self.model_fine is not None:
+            self.model_fine.train()

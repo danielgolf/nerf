@@ -3,6 +3,7 @@ __pycache__/
 .vscode/
 data/
 logs/
+push.sh
 test.*
 *.png
 *.mp4

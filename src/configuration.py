@@ -54,12 +54,13 @@ def getcfg():
         required=True,
         help="Path to (.yml) config file."
     )
-    parser.add_argument(
-        "--load-checkpoint",
-        type=str,
-        default="",
-        help="Path to load saved checkpoint from."
-    )
+    # TODO read from given checkpoint
+    # parser.add_argument(
+    #     "--load-checkpoint",
+    #     type=str,
+    #     default="",
+    #     help="Path to load saved checkpoint from."
+    # )
     configargs = parser.parse_args()
 
     # Read config file.
