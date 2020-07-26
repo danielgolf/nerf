@@ -1,4 +1,8 @@
 import torch
+import torchvision
+import numpy as np
+
+import torchsearchsorted
 
 
 def get_ray_bundle(height, width, focal_length, tform_cam2world):
@@ -36,3 +40,64 @@ def cumprod_exclusive(tensor):
     cumprod[..., 0] = 1.0
     return cumprod
 
+
+def gather_cdf_util(cdf, inds):
+    orig_inds_shape = inds.shape
+    inds_flat = [inds[i].view(-1) for i in range(inds.shape[0])]
+    valid_mask = [
+        torch.where(ind >= cdf.shape[1], torch.zeros_like(
+            ind), torch.ones_like(ind))
+        for ind in inds_flat
+    ]
+    inds_flat = [
+        torch.where(
+            ind >= cdf.shape[1], (cdf.shape[1] - 1) * torch.ones_like(ind), ind)
+        for ind in inds_flat
+    ]
+    cdf_flat = [cdf[i][ind] for i, ind in enumerate(inds_flat)]
+    cdf_flat = [cdf_flat[i] * valid_mask[i] for i in range(len(cdf_flat))]
+    cdf_flat = [
+        cdf_chunk.reshape([1] + list(orig_inds_shape[1:])) for cdf_chunk in cdf_flat
+    ]
+    return torch.cat(cdf_flat, dim=0)
+
+
+def sample_pdf(bins, weights, num_samples, deterministic=False):
+    weights = weights + 1e-5  # prevent nans
+    pdf = weights / weights.sum(-1).unsqueeze(-1)
+    cdf = torch.cumsum(pdf, -1)
+    cdf = torch.cat((torch.zeros_like(cdf[..., :1]), cdf), -1)
+
+    # Take uniform samples
+    if deterministic:
+        u = torch.linspace(0.0, 1.0, num_samples).to(weights)
+        u = u.expand(list(cdf.shape[:-1]) + [num_samples])
+    else:
+        u = torch.rand(list(cdf.shape[:-1]) + [num_samples]).to(weights)
+
+    # Invert CDF
+    inds = torchsearchsorted.searchsorted(
+        cdf.contiguous(), u.contiguous(), side="right"
+    )
+
+    below = torch.max(torch.zeros_like(inds), inds - 1)
+    above = torch.min((cdf.shape[-1] - 1) * torch.ones_like(inds), inds)
+    inds_g = torch.stack((below, above), -1)
+
+    cdf_g = gather_cdf_util(cdf, inds_g)
+    bins_g = gather_cdf_util(bins, inds_g)
+
+    denom = cdf_g[..., 1] - cdf_g[..., 0]
+    denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
+    t = (u - cdf_g[..., 0]) / denom
+    return bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
+
+
+def cast_to_image(tensor):
+    # Input tensor is (H, W, 3). Convert to (3, H, W).
+    tensor = tensor.permute(2, 0, 1)
+    # Conver to PIL Image and then np.array (output shape: (H, W, 3))
+    img = np.array(torchvision.transforms.ToPILImage()(tensor.detach().cpu()))
+    # Map back to shape (3, H, W), as tensorboard needs channels first.
+    img = np.moveaxis(img, [-1], [0])
+    return img

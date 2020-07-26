@@ -191,6 +191,11 @@ class Nerf():
             self.model_coarse.parameters(),
             cfg.train.optimizer.lr
         )
+        dec_fac = cfg.train.scheduler.lr_decay_factor
+        decay = cfg.train.scheduler.lr_decay * 1000
+        self.sched = torch.optim.lr_scheduler.ExponentialLR(
+            self.opt, dec_fac ** (1 / decay)
+        )
 
     def load(self):
         if not os.path.isfile(self.checkpoint_path):
@@ -199,15 +204,17 @@ class Nerf():
 
         checkpoint = torch.load(self.checkpoint_path)
         self.model_coarse.load_state_dict(checkpoint['model_coarse'])
-        if checkpoint['model_fine'] is not None:
+        if 'model_fine' in checkpoint:
             self.model_fine.load_state_dict(checkpoint['model_fine'])
         self.opt.load_state_dict(checkpoint['opt'])
+        self.sched.load_state_dict(checkpoint['sched'])
         self.iter = checkpoint['iter']
 
     def save(self):
         checkpoint = {
             'model_coarse': self.model_coarse.state_dict(),
             'opt': self.opt.state_dict(),
+            'sched': self.sched.state_dict(),
             'iter': self.iter
         }
         if self.model_fine is None:

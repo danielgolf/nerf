@@ -31,13 +31,12 @@ def volume_render_radiance_field(
     rgb_map = weights[..., None] * rgb
     rgb_map = rgb_map.sum(dim=-2)
 
-    if white_background:
-        rgb_map = rgb_map + (1.0 - acc_map[..., None])
-
     depth_map = (weights * z_vals).sum(dim=-1)
     acc_map = weights.sum(dim=-1)
     disp_map = torch.max(1e-10 * torch.ones_like(depth_map), depth_map / acc_map)
     disp_map = 1 / disp_map
 
-    # TODO: what do I need?
-    return rgb_map, disp_map, acc_map, weights, depth_map
+    if white_background:
+        rgb_map = rgb_map + (1.0 - acc_map[..., None])
+
+    return rgb_map, weights

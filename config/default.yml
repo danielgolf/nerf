@@ -87,18 +87,18 @@ train:
     # Learning rate.
     lr: 5.0E-3
   # Learning rate schedule.
-  #scheduler:
+  scheduler:
     # Exponentially decay learning rate (in 1000 steps)
-    #lr_decay: 250
+    lr_decay: 250
     # Rate at which to apply this decay.
-    #lr_decay_factor: 0.1
+    lr_decay_factor: 0.1
   # Number of training iterations.
   #iters: 100000
   iters: 1
   # Number of training iterations after which to checkpoint.
-  #save_every: 5000
+  save_every: 5000
   # Number of training iterations after which to print progress.
-  #print_every: 100
+  print_every: 100
   # Number of random rays to retain from each image.
   # These sampled rays are used for training, and the others are discarded.
   num_random_rays: 1024  # 32 * 32 * 4
@@ -119,22 +119,22 @@ train:
   # Sample linearly in disparity space, as opposed to in depth space.
   #lindisp: False
 # Validation-specific parameters.
-#validation:
+validation:
   # Number of training iterations after which to validate.
-  #validate_every: 100
+  every: 100
   # Number of random rays to retain from each image.
   # These sampled rays are used for training, and the others are discarded.
-  #chunksize: 131072   # 1024 * 32
+  chunksize: 16384
   # Whether or not to perturb the sampled depth values.
-  #perturb: False
+  perturb: False
   # Number of depth samples per ray for the coarse network.
-  #num_coarse: 64
+  num_coarse: 64
   # Number of depth samples per ray for the fine network.
-  #num_fine: 64
+  num_fine: 64
   # Whether to render models using a white background.
-  #white_background: False
+  white_background: False
   # Standard deviation of noise to be added to the radiance field when
   # performing volume rendering.
-  #radiance_field_noise_std: 0.
+  radiance_noise_std: 0.
   # Sample linearly in disparity space, as opposed to in depth space.
   #lindisp: False
