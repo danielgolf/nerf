@@ -4,6 +4,7 @@ from tqdm import trange
 
 from model import Nerf
 from dataio.loader import load_data
+from render import volume_render_radiance_field
 
 
 def get_ray_bundle(height, width, focal_length, tform_cam2world):
@@ -105,4 +106,7 @@ def train(cfg):
         out = torch.cat([nerf.model_coarse(xin) for xin in batches], dim=0)
         out = out.reshape(x_xyz.shape[:-1] + out.shape[-1:])
 
-        # === dev ===
+        rgb_map, disp_map, acc_map, weights, depth_map = volume_render_radiance_field(
+            out, z_vals, ray_dir,
+            cfg.train.radiance_noise_std, cfg.train.white_background
+        )

@@ -90,7 +90,7 @@ def load(cfg):
         for angle in np.linspace(-180, 180, 40, endpoint=False)
     ], axis=0)
 
-    if cfg.dataset.white_background:
+    if cfg.train.white_background:
         imgs = imgs[..., :3] * imgs[..., -1:] + (1. - imgs[..., -1:])
     else:
         imgs = imgs[..., :3]

@@ -28,8 +28,6 @@ dataset:
   near: 2
   # Far clip plane (clip all depth values farther than this threshold).
   far: 6
-  # Whether to render models using a white background.
-  white_background: False
 
 # Model parameters.
 model:
@@ -113,9 +111,11 @@ train:
   num_coarse: 64
   # Number of depth samples per ray for the fine network.
   #num_fine: 64
+  # Whether to render models using a white background.
+  white_background: False
   # Standard deviation of noise to be added to the radiance field when
   # performing volume rendering.
-  #radiance_field_noise_std: 0.2
+  radiance_field_noise_std: 0.2
   # Sample linearly in disparity space, as opposed to in depth space.
   #lindisp: False
 # Validation-specific parameters.
