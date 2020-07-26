@@ -1,14 +1,6 @@
 import torch
 
-
-def cumprod_exclusive(tensor):
-    """
-    Mimick functionality of tf.math.cumprod(..., exclusive=True), as it isn't available in PyTorch.
-    """
-    cumprod = torch.cumprod(tensor, -1)
-    cumprod = torch.roll(cumprod, 1, -1)
-    cumprod[..., 0] = 1.0
-    return cumprod
+from utils import cumprod_exclusive
 
 
 def volume_render_radiance_field(

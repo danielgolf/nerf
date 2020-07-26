@@ -4,6 +4,8 @@ from torch import nn
 import torch.nn.functional as F
 from torch.utils import tensorboard
 
+from utils import get_minibatches
+
 
 class Embedder:
     """
@@ -224,3 +226,22 @@ class Nerf():
         self.model_coarse.train()
         if self.model_fine is not None:
             self.model_fine.train()
+
+    def eval(self):
+        self.model_coarse.eval()
+        if self.model_fine is not None:
+            self.model_fine.eval()
+
+    def run(self, x_xyz, ray_dir=None, chunksize=8192):
+        x = self.embed_xyz_coarse(x_xyz.reshape((-1, x_xyz.shape[-1])))
+        if ray_dir is not None:
+            x_dir = ray_dir / ray_dir.norm(p=2, dim=-1).unsqueeze(-1)
+            # TODO: maybe needed for LLFF/deepvoxel dataset
+            # viewdirs = viewdirs.view((-1, 3))
+            x_dir = x_dir[..., None, :].expand(x_xyz.shape)
+            x_dir = self.embed_dir_coarse(x_dir.reshape((-1, x_dir.shape[-1])))
+            x = torch.cat((x, x_dir), dim=-1)
+
+        batches = get_minibatches(x, chunksize)
+        out = torch.cat([self.model_coarse(xin) for xin in batches], dim=0)
+        return out.reshape(x_xyz.shape[:-1] + out.shape[-1:])

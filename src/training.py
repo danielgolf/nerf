@@ -3,34 +3,9 @@ import numpy as np
 from tqdm import trange
 
 from model import Nerf
+from utils import get_ray_bundle
 from dataio.loader import load_data
 from render import volume_render_radiance_field
-
-
-def get_ray_bundle(height, width, focal_length, tform_cam2world):
-    ii, jj = torch.meshgrid(
-        torch.arange(width).to(tform_cam2world),
-        torch.arange(height).to(tform_cam2world)
-    )
-    xx, yy = ii.T, jj.T
-    directions = torch.stack([
-        (xx - width * 0.5) / focal_length,
-        -(yy - height * 0.5) / focal_length,
-        -torch.ones_like(xx),
-    ], -1)
-    ray_directions = torch.sum(
-        directions[..., None, :] * tform_cam2world[:3, :3], dim=-1
-    )
-    ray_origins = tform_cam2world[:3, -1].expand(ray_directions.shape)
-    coords = torch.stack([yy, xx], -1).to(torch.int64).reshape(-1, 2)
-    return coords, ray_origins, ray_directions
-
-
-def get_minibatches(inputs, chunksize=8192):
-    out = []
-    for i in range(0, inputs.shape[0], chunksize):
-        out.append(inputs[i:i+chunksize])
-    return out
 
 
 def train(cfg):
@@ -93,20 +68,30 @@ def train(cfg):
             z_vals = lower + (upper - lower) * rand
 
         x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
-        x = nerf.embed_xyz_coarse(x_xyz.reshape((-1, x_xyz.shape[-1])))
-        if cfg.model.use_viewdirs:
-            x_dir = ray_dir / ray_dir.norm(p=2, dim=-1).unsqueeze(-1)
-            # TODO: maybe needed for LLFF/deepvoxel dataset
-            # viewdirs = viewdirs.view((-1, 3))
-            x_dir = x_dir[..., None, :].expand(x_xyz.shape)
-            x_dir = nerf.embed_dir_coarse(x_dir.reshape((-1, x_dir.shape[-1])))
-            x = torch.cat((x, x_dir), dim=-1)
-
-        batches = get_minibatches(x, cfg.train.chunksize)
-        out = torch.cat([nerf.model_coarse(xin) for xin in batches], dim=0)
-        out = out.reshape(x_xyz.shape[:-1] + out.shape[-1:])
+        out = nerf.run(x_xyz, ray_dir, cfg.train.chunksize)
 
         rgb_map, disp_map, acc_map, weights, depth_map = volume_render_radiance_field(
             out, z_vals, ray_dir,
             cfg.train.radiance_noise_std, cfg.train.white_background
         )
+
+        rgb_fine, disp_fine, acc_fine = None, None, None
+
+        if nerf.model_fine is not None:
+            z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
+            z_samples = sample_pdf(
+                z_vals_mid,
+                weights[..., 1:-1],
+                cfg.train.num_fine,
+                deterministic=(cfg.train.perturb == 0.0),
+            )
+            # TODO: needed? z_samples = z_samples.detach()
+            z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
+
+            x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
+            out = nerf.run(x_xyz, ray_dir, cfg.train.chunksize)
+
+            rgb_fine, disp_fine, acc_fine, _, _ = volume_render_radiance_field(
+                out, z_vals, ray_dir,
+                cfg.train.radiance_noise_std, cfg.train.white_background
+            )
