@@ -66,7 +66,7 @@ def getcfg():
     # Read config file.
     cfg = None
     with open(configargs.config, "r") as fp:
-        cfg_dict = yaml.load(fp, Loader=yaml.FullLoader)
+        cfg_dict = yaml.load(fp) #, Loader=yaml.FullLoader)
         cfg = Config(cfg_dict)
 
     cfg.configuration_path = configargs.config

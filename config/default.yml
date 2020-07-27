@@ -94,7 +94,7 @@ train:
     lr_decay_factor: 0.1
   # Number of training iterations.
   #iters: 100000
-  iters: 1
+  iters: 100000
   # Number of training iterations after which to checkpoint.
   save_every: 5000
   # Number of training iterations after which to print progress.
