@@ -30,7 +30,12 @@ def fix_seed(seed):
 def main(cfg):
     setup_dirs(cfg)
     fix_seed(cfg.experiment.random_seed)
-    # TODO: Short circuit if only rendering out from trained model
+
+    if cfg.render_only:
+        print("Render only not yet implemented")
+        # TODO
+        return
+
     train(cfg)
 
 

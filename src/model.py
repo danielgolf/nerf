@@ -182,7 +182,6 @@ class Nerf():
             self.dim_dir_fine = 3 * e.num_fns
 
     def _create_optimizer(self, cfg):
-        # TODO exponential decay
         params = list(self.model_coarse.parameters())
         if self.model_fine is not None:
             params += list(self.model_fine.parameters())

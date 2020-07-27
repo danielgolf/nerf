@@ -1,6 +1,4 @@
 import torch
-import torchvision
-import numpy as np
 
 import torchsearchsorted
 
@@ -95,9 +93,4 @@ def sample_pdf(bins, weights, num_samples, deterministic=False):
 
 def cast_to_image(tensor):
     # Input tensor is (H, W, 3). Convert to (3, H, W).
-    tensor = tensor.permute(2, 0, 1)
-    # Conver to PIL Image and then np.array (output shape: (H, W, 3))
-    img = np.array(torchvision.transforms.ToPILImage()(tensor.detach().cpu()))
-    # Map back to shape (3, H, W), as tensorboard needs channels first.
-    img = np.moveaxis(img, [-1], [0])
-    return img
+    return tensor.detach().cpu().permute(2, 0, 1).numpy()

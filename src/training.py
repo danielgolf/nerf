@@ -133,16 +133,17 @@ def train(cfg):
         saveA = i % cfg.train.save_every == 0
         if saveA or printB:
             nerf.save()
-            tqdm.write("================== Saved Checkpoint =================")
+            tqdm.write("=== Saved Checkpoint ===")
 
         nerf.writer.add_scalar("train/loss", loss.item(), i)
         nerf.writer.add_scalar("train/coarse_loss", coarse_loss.item(), i)
+        nerf.writer.add_scalar("train/lr", nerf.sched.get_last_lr()[0], i)
         if rgb_fine is not None:
             nerf.writer.add_scalar("train/fine_loss", fine_loss.item(), i)
 
         validA = i % cfg.validation.every
         if validA or printB:
-            tqdm.write(f"[VAL] =======> Iter: {i}")
+            tqdm.write(f"[VAL] ===> Iter: {i}")
             nerf.eval()
 
             with torch.no_grad():
@@ -171,7 +172,8 @@ def train(cfg):
                 )
 
                 rgb_coarse = rgb_coarse.reshape(img[..., :3].shape)
-                rgb_fine = rgb_fine.reshape(img[..., :3].shape)
+                if rgb_fine is not None:
+                    rgb_fine = rgb_fine.reshape(img[..., :3].shape)
 
                 coarse_loss = torch.nn.functional.mse_loss(
                     rgb_coarse[..., :3], img[..., :3]

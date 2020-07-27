@@ -13,9 +13,6 @@ dataset:
   type: blender
   # Path to dataset.
   path: data/nerf_synthetic/lego
-  # Optionally, provide a path to the pre-cached dataset dir. This
-  # overrides the other dataset options.
-  #cachedir: cache/legocache200
   # For the Blender datasets (synthetic), optionally return images
   # at half the original resolution of 800 x 800, to save space.
   half_res: True
@@ -93,12 +90,11 @@ train:
     # Rate at which to apply this decay.
     lr_decay_factor: 0.1
   # Number of training iterations.
-  #iters: 100000
   iters: 100000
   # Number of training iterations after which to checkpoint.
-  save_every: 5000
+  save_every: 2500
   # Number of training iterations after which to print progress.
-  print_every: 100
+  print_every: 1000
   # Number of random rays to retain from each image.
   # These sampled rays are used for training, and the others are discarded.
   num_random_rays: 1024  # 32 * 32 * 4

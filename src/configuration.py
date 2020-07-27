@@ -54,13 +54,13 @@ def getcfg():
         required=True,
         help="Path to (.yml) config file."
     )
-    # TODO read from given checkpoint
-    # parser.add_argument(
-    #     "--load-checkpoint",
-    #     type=str,
-    #     default="",
-    #     help="Path to load saved checkpoint from."
-    # )
+    parser.add_argument(
+        "--renderonly",
+        type=bool,
+        default=False,
+        help="Wether to render an image."
+    )
+
     configargs = parser.parse_args()
 
     # Read config file.
@@ -70,6 +70,7 @@ def getcfg():
         cfg = Config(cfg_dict)
 
     cfg.configuration_path = configargs.config
+    cfg.render_only = configargs.renderonly
     return cfg
 
 
