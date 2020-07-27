@@ -11,7 +11,7 @@ from training import nerf_iteration
 from dataio.loader import load_data
 
 
-def eval(cfg):
+def evalnerf(cfg):
     expid = cfg.experiment.id
     logdir = cfg.experiment.logdir
     save_dir = os.path.join(logdir, expid, 'rendered')
@@ -39,7 +39,7 @@ def eval(cfg):
     with torch.no_grad():
         for i, pose in enumerate(tqdm(render_poses)):
             pose = torch.from_numpy(pose).to(torch.float32).to(device)
-            _, ray_ori, ray_dir= get_ray_bundle(
+            _, ray_ori, ray_dir = get_ray_bundle(
                 H, W, focal, pose
             )
 
@@ -66,6 +66,5 @@ def eval(cfg):
 
             save_file = os.path.join(save_dir, f"{i:04d}.png")
             img = np.array(torchvision.transforms.ToPILImage()(
-                rgb.permute(2, 0, 1).detach().cpu())
-            )
+                rgb.permute(2, 0, 1).detach().cpu()))
             imageio.imwrite(save_file, img)

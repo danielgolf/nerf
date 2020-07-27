@@ -80,6 +80,7 @@ def train(cfg):
 
     # Create nerf model
     nerf = Nerf(cfg)
+    nerf.to(device) # Needed to continue learning from a checkpoint
     nerf.load()
     nerf.to(device)
 
@@ -147,6 +148,7 @@ def train(cfg):
         if rgb_fine is not None:
             nerf.writer.add_scalar("train/fine_loss", fine_loss.item(), i)
 
+        continue # validation needs to much memory
         validA = i % cfg.validation.every
         if validA or printB:
             tqdm.write(f"[VAL] ===> Iter: {i}")

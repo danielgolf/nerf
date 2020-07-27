@@ -3,7 +3,7 @@ import torch
 import numpy as np
 
 from training import train
-from evaluation import eval
+from evaluation import evalnerf
 from configuration import getcfg
 
 
@@ -33,7 +33,7 @@ def main(cfg):
     fix_seed(cfg.experiment.random_seed)
 
     if cfg.render_only:
-        eval(cfg)
+        evalnerf(cfg)
         return
 
     train(cfg)
