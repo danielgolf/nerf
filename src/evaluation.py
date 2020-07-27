@@ -88,6 +88,7 @@ def eval(cfg):
 
     with torch.no_grad():
         for i, pose in enumerate(tqdm(render_poses)):
+            pose = torch.from_numpy(pose).to(device)
             _, ray_ori, ray_dir= get_ray_bundle(
                 H, W, focal, pose
             )

@@ -3,6 +3,7 @@ import torch
 import numpy as np
 
 from training import train
+from evaluation import eval
 from configuration import getcfg
 
 
@@ -32,8 +33,7 @@ def main(cfg):
     fix_seed(cfg.experiment.random_seed)
 
     if cfg.render_only:
-        print("Render only not yet implemented")
-        # TODO
+        eval(cfg)
         return
 
     train(cfg)
