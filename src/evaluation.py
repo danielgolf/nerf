@@ -1,6 +1,8 @@
 import os
 import torch
 import imageio
+import torchvision
+import numpy as np
 from tqdm import tqdm
 
 from model import Nerf
@@ -36,7 +38,7 @@ def eval(cfg):
 
     with torch.no_grad():
         for i, pose in enumerate(tqdm(render_poses)):
-            pose = torch.from_numpy(pose).to(torch.float32)
+            pose = torch.from_numpy(pose).to(torch.float32).to(device)
             _, ray_ori, ray_dir= get_ray_bundle(
                 H, W, focal, pose
             )
@@ -63,7 +65,7 @@ def eval(cfg):
                 rgb = rgb_coarse.reshape(img_shape)
 
             save_file = os.path.join(save_dir, f"{i:04d}.png")
-            imageio.imwrite(
-                save_file,
-                rgb.detach().cpu().numpy()
+            img = np.array(torchvision.transforms.ToPILImage()(
+                rgb.permute(2, 0, 1).detach().cpu())
             )
+            imageio.imwrite(save_file, img)

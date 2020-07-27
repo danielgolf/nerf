@@ -12,12 +12,14 @@ def nerf_iteration(nerf, cfg, pose, ray_ori, ray_dir, near, far, mode='train'):
     # TODO NDC option
     near = near * torch.ones_like(ray_ori[..., :1])
     far = far * torch.ones_like(ray_ori[..., :1])
-
     t = torch.linspace(0., 1., getattr(cfg, mode).num_coarse).to(pose)
     # TODO: lindisp option
     z_vals = near * (1. - t) + far * t
     # TODO: maybe needed for LLFF/deepvoxel dataset
     # z_vals = z_vals.expand([ray_batch.shape[0], cfg.train.num_coarse])
+    del near, far, t
+    torch.cuda.empty_cache()
+
     # basically eq. 2 in the paper
     if getattr(cfg, mode).perturb:
         mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
@@ -25,6 +27,8 @@ def nerf_iteration(nerf, cfg, pose, ray_ori, ray_dir, near, far, mode='train'):
         lower = torch.cat((z_vals[..., :1], mids), dim=-1)
         rand = torch.rand(z_vals.shape).to(z_vals)
         z_vals = lower + (upper - lower) * rand
+        del mids, upper, lower, rand
+        torch.cuda.empty_cache()
 
     x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
     out = nerf.run(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
@@ -45,6 +49,8 @@ def nerf_iteration(nerf, cfg, pose, ray_ori, ray_dir, near, far, mode='train'):
         )
         # TODO: needed? z_samples = z_samples.detach()
         z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
+        del z_vals_mid, z_samples, out
+        torch.cuda.empty_cache()
 
         x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
         out = nerf.run(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
