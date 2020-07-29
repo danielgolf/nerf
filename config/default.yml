@@ -92,9 +92,9 @@ train:
   # Number of training iterations.
   iters: 100000
   # Number of training iterations after which to checkpoint.
-  save_every: 5000
+  save_every: 2500
   # Number of training iterations after which to print progress.
-  print_every: 1000
+  print_every: 500
   # Number of random rays to retain from each image.
   # These sampled rays are used for training, and the others are discarded.
   num_random_rays: 1024
