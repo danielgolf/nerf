@@ -7,7 +7,7 @@ from torch.utils import tensorboard
 from utils import get_minibatches
 
 
-class Embedder:
+def positional_encoding(x, num_freq, include_input=True):
     """
     positional encoding // kernel
     TODO: arguments mising here, but included in original implementation:
@@ -15,32 +15,10 @@ class Embedder:
         * log_sampling (True)
         * ...
     """
-
-    def __init__(self, num_freqs, periodic_fns, include_input=True):
-        self.num_freqs = num_freqs
-        self.periodic_fns = periodic_fns
-        self.create_embedding_fn(include_input)
-
-    def create_embedding_fn(self, include_input):
-        n_fns = 0
-        embed_fns = []
-
-        if include_input:
-            n_fns += 1
-            embed_fns.append(lambda x: x)
-
-        freq_bands = 2. ** torch.arange(self.num_freqs)
-        for freq in freq_bands:
-            for p_fn in self.periodic_fns:
-                n_fns += 1
-                # TODO: original paper states 2^k * pi * x - where is the pi?
-                embed_fns.append(lambda x, p_fn=p_fn, freq=freq: p_fn(x * freq))
-
-        self.embed_fns = embed_fns
-        self.num_fns = n_fns
-
-    def embed(self, inputs):
-        return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
+    freq = (x[..., None] * (2 ** torch.arange(num_freq).to(x))).view(x.shape[0], -1)
+    if include_input:
+        return torch.cat([x, torch.cos(freq), torch.sin(freq)], dim=-1)
+    return torch.cat([torch.cos(freq), torch.sin(freq)], dim=-1)
 
 
 class NerfMLP(nn.Module):
@@ -142,44 +120,38 @@ class Nerf():
         print('Model loaded.')
 
     def _create_embeddings(self, cfg):
-        periodic_fns = [torch.sin, torch.cos]
-
-        e = Embedder(
-            cfg.model.coarse.num_encoding_xyz,
-            periodic_fns,
+        self.embed_xyz_coarse = lambda x: positional_encoding(
+            x, cfg.model.coarse.num_encoding_xyz,
             cfg.model.coarse.include_input_xyz
         )
-        self.embed_xyz_coarse = lambda x, emb=e: emb.embed(x)
-        self.dim_xyz_coarse = 3 * e.num_fns
+        self.dim_xyz_coarse = 6 * cfg.model.coarse.num_encoding_xyz
+        self.dim_xyz_coarse += 3 if cfg.model.coarse.include_input_xyz else 0
 
         if cfg.model.use_viewdirs:
-            e = Embedder(
-                cfg.model.coarse.num_encoding_dir,
-                periodic_fns,
+            self.embed_dir_coarse = lambda x: positional_encoding(
+                x, cfg.model.coarse.num_encoding_dir,
                 cfg.model.coarse.include_input_dir
             )
-            self.embed_dir_coarse = lambda x, emb=e: emb.embed(x)
-            self.dim_dir_coarse = 3 * e.num_fns
+            self.dim_dir_coarse = 6 * cfg.model.coarse.num_encoding_dir
+            self.dim_dir_coarse += 3 if cfg.model.coarse.include_input_dir else 0
 
         if cfg.model.fine is None:
             return
 
-        e = Embedder(
-            cfg.model.fine.num_encoding_xyz,
-            periodic_fns,
+        self.embed_xyz_fine = lambda x: positional_encoding(
+            x, cfg.model.fine.num_encoding_xyz,
             cfg.model.fine.include_input_xyz
         )
-        self.embed_xyz_fine = lambda x, emb=e: emb.embed(x)
-        self.dim_xyz_fine = 3 * e.num_fns
+        self.dim_xyz_fine = 6 * cfg.model.fine.num_encoding_xyz
+        self.dim_xyz_fine += 3 if cfg.model.fine.include_input_xyz else 0
 
         if cfg.model.use_viewdirs:
-            e = Embedder(
-                cfg.model.fine.num_encoding_dir,
-                periodic_fns,
+            self.embed_dir_fine = lambda x: positional_encoding(
+                x, cfg.model.fine.num_encoding_dir,
                 cfg.model.fine.include_input_dir
             )
-            self.embed_dir_fine = lambda x, emb=e: emb.embed(x)
-            self.dim_dir_fine = 3 * e.num_fns
+            self.dim_dir_fine = 6 * cfg.model.fine.num_encoding_dir
+            self.dim_dir_fine += 3 if cfg.model.fine.include_input_dir else 0
 
     def create_optimizer(self, cfg):
         params = list(self.model_coarse.parameters())
@@ -238,7 +210,7 @@ class Nerf():
         if self.model_fine is not None:
             self.model_fine.eval()
 
-    def predict(self, x_xyz, ray_dir=None, chunksize=8192):
+    def predict_coarse(self, x_xyz, ray_dir=None, chunksize=8192):
         x = self.embed_xyz_coarse(x_xyz.reshape((-1, x_xyz.shape[-1])))
         if self.embed_dir_coarse is not None:
             x_dir = ray_dir / ray_dir.norm(p=2, dim=-1).unsqueeze(-1)
@@ -248,4 +220,16 @@ class Nerf():
 
         batches = get_minibatches(x, chunksize)
         out = torch.cat([self.model_coarse(xin) for xin in batches], dim=0)
+        return out.reshape(x_xyz.shape[:-1] + out.shape[-1:])
+
+    def predict_fine(self, x_xyz, ray_dir=None, chunksize=8192):
+        x = self.embed_xyz_fine(x_xyz.reshape((-1, x_xyz.shape[-1])))
+        if self.embed_dir_fine is not None:
+            x_dir = ray_dir / ray_dir.norm(p=2, dim=-1).unsqueeze(-1)
+            x_dir = x_dir[..., None, :].expand(x_xyz.shape)
+            x_dir = self.embed_dir_fine(x_dir.reshape((-1, x_dir.shape[-1])))
+            x = torch.cat((x, x_dir), dim=-1)
+
+        batches = get_minibatches(x, chunksize)
+        out = torch.cat([self.model_fine(xin) for xin in batches], dim=0)
         return out.reshape(x_xyz.shape[:-1] + out.shape[-1:])

@@ -32,7 +32,7 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
             z_vals = lower + (upper - lower) * rand
 
         x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
-        out = nerf.predict(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
+        out = nerf.predict_coarse(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
 
         rgb_coarse, weights = volume_render_radiance_field(
             out, z_vals, ray_dir,
@@ -54,7 +54,7 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
             z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
 
             x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
-            out = nerf.predict(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
+            out = nerf.predict_fine(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
 
             rgb_fine, _ = volume_render_radiance_field(
                 out, z_vals, ray_dir,
@@ -91,7 +91,7 @@ def train(cfg):
     nerf.load()
     nerf.create_optimizer(cfg)
 
-    for i in trange(nerf.iter, cfg.train.iters):
+    for i in trange(nerf.iter, cfg.train.iters + 1):
         nerf.train()    # require gradients and stuff
 
         idx = np.random.choice(i_train)
