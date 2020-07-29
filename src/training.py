@@ -72,7 +72,7 @@ def train(cfg):
         device = "cuda"
     else:
         device = "cpu"
-    print(f"Running on device: {device}.")
+    print(f"Running on device: {device.replace('cuda', 'gpu').upper()}")
 
     # TODO: make consistent with other data types (e.g. llff)
     # Load data
@@ -137,7 +137,7 @@ def train(cfg):
         lastIt = i == cfg.train.iters - 1
         printIt = (i + 1) % cfg.train.print_every == 0
         if lastIt or printIt:
-            tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}")
+            tqdm.write(f"[TRAIN] Iter: {i+1} Loss: {loss.item()}")
 
         saveIt = (i + 1) % cfg.train.save_every == 0
         if lastIt or saveIt:
@@ -152,13 +152,12 @@ def train(cfg):
 
         valIt = (i + 1) % cfg.validation.every == 0
         if lastIt or valIt:
-            tqdm.write(f"[VAL] ===> Iter: {i}")
             nerf.eval()
 
             with torch.no_grad():
                 rgb_coarse, rgb_fine = None, None
 
-                idx = np.random.choice(i_train)
+                idx = np.random.choice(i_val)
                 img = torch.from_numpy(images[idx]).to(device)
                 pose = torch.from_numpy(poses[idx]).to(device)
 
@@ -210,5 +209,5 @@ def train(cfg):
                     nerf.writer.add_scalar("validation/fine_loss",
                                       fine_loss.item(), i)
 
-                tqdm.write(f"[VALID] Iter: {i} Loss: {loss.item()}")
+                tqdm.write(f"[VALID] Iter: {i+1} Loss: {loss.item()}")
     print("Done!")
