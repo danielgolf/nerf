@@ -134,13 +134,13 @@ def train(cfg):
         nerf.sched.step()
         nerf.opt.zero_grad()
 
-        printA = i % cfg.train.print_every == 0
-        printB = i == cfg.train.iters - 1
-        if printA or printB:
+        lastIt = i == cfg.train.iters - 1
+        printIt = i % cfg.train.print_every == 0
+        if lastIt or printIt:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}")
 
-        saveA = i % cfg.train.save_every == 0
-        if saveA or printB:
+        saveIt = i % cfg.train.save_every == 0
+        if lastIt or saveIt:
             nerf.save()
             tqdm.write("=== Saved Checkpoint ===")
 
@@ -150,8 +150,8 @@ def train(cfg):
         if rgb_fine is not None:
             nerf.writer.add_scalar("train/fine_loss", fine_loss.item(), i)
 
-        validA = i % cfg.validation.every
-        if validA or printB:
+        valIt = i % cfg.validation.every == 0
+        if lastIt or valIt:
             tqdm.write(f"[VAL] ===> Iter: {i}")
             nerf.eval()
 
