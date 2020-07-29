@@ -127,8 +127,6 @@ class Nerf():
             skips=cfg.model.fine.skip_connections
         ) if cfg.model.fine is not None else None
 
-        self._create_optimizer(cfg)
-
         self.log_path = os.path.join(
             cfg.experiment.logdir,
             cfg.experiment.id
@@ -137,6 +135,8 @@ class Nerf():
             self.log_path,
             'checkpoint.pt'
         )
+
+        self.opt, self.sched = None, None
         self.writer = tensorboard.writer.SummaryWriter(self.log_path)
         self.iter = 0
         print('Model loaded.')
@@ -181,7 +181,7 @@ class Nerf():
             self.embed_dir_fine = lambda x, emb=e: emb.embed(x)
             self.dim_dir_fine = 3 * e.num_fns
 
-    def _create_optimizer(self, cfg):
+    def create_optimizer(self, cfg):
         params = list(self.model_coarse.parameters())
         if self.model_fine is not None:
             params += list(self.model_fine.parameters())
@@ -238,12 +238,10 @@ class Nerf():
         if self.model_fine is not None:
             self.model_fine.eval()
 
-    def run(self, x_xyz, ray_dir=None, chunksize=8192):
+    def predict(self, x_xyz, ray_dir=None, chunksize=8192):
         x = self.embed_xyz_coarse(x_xyz.reshape((-1, x_xyz.shape[-1])))
-        if ray_dir is not None:
+        if self.embed_dir_coarse is not None:
             x_dir = ray_dir / ray_dir.norm(p=2, dim=-1).unsqueeze(-1)
-            # TODO: maybe needed for LLFF/deepvoxel dataset
-            # viewdirs = viewdirs.view((-1, 3))
             x_dir = x_dir[..., None, :].expand(x_xyz.shape)
             x_dir = self.embed_dir_coarse(x_dir.reshape((-1, x_dir.shape[-1])))
             x = torch.cat((x, x_dir), dim=-1)

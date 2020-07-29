@@ -43,15 +43,14 @@ def evalnerf(cfg):
                 H, W, focal, pose
             )
 
-            # TODO Make 3d rays possible in nerf_iteration
             img_shape = ray_ori.shape
             ray_ori = ray_ori.reshape((-1, ray_ori.shape[-1]))
             ray_dir = ray_dir.reshape((-1, ray_dir.shape[-1]))
 
+            # TODO: batchify
             rgb_coarse, rgb_fine = nerf_iteration(
                 nerf,
                 cfg,
-                pose,
                 ray_ori,
                 ray_dir,
                 near,

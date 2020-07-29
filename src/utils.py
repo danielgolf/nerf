@@ -41,6 +41,7 @@ def cumprod_exclusive(tensor):
     return cumprod
 
 
+# TODO understand and rewrite
 def gather_cdf_util(cdf, inds):
     orig_inds_shape = inds.shape
     inds_flat = [inds[i].view(-1) for i in range(inds.shape[0])]
@@ -62,6 +63,7 @@ def gather_cdf_util(cdf, inds):
     return torch.cat(cdf_flat, dim=0)
 
 
+# TODO understand and rewrite
 def sample_pdf(bins, weights, num_samples, deterministic=False):
     weights = weights + 1e-5  # prevent nans
     pdf = weights / weights.sum(-1).unsqueeze(-1)

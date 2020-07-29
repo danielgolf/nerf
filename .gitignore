@@ -4,6 +4,7 @@ __pycache__/
 data/
 logs/
 push.sh
+todo.txt
 test.*
 *.png
 *.mp4
