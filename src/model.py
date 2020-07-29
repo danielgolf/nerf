@@ -187,7 +187,7 @@ class Nerf():
             params += list(self.model_fine.parameters())
 
         self.opt = getattr(torch.optim, cfg.train.optimizer.type)(
-            self.model_coarse.parameters(),
+            params,
             cfg.train.optimizer.lr
         )
         dec_fac = cfg.train.scheduler.lr_decay_factor

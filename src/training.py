@@ -8,15 +8,15 @@ from render import volume_render_radiance_field
 from utils import get_ray_bundle, sample_pdf, cast_to_image, get_minibatches
 
 
-def nerf_iteration(nerf, cfg, rays, near, far, mode='train'):
+def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
     batches = get_minibatches(rays, getattr(cfg, mode).chunksize)
     coarse, fine = [], []
     for batch in batches:
         ray_ori, ray_dir = batch[..., :3], batch[..., 3:]
 
         # TODO NDC option
-        near = near * torch.ones_like(ray_ori[..., :1])
-        far = far * torch.ones_like(ray_ori[..., :1])
+        near = near_val * torch.ones_like(ray_ori[..., :1])
+        far = far_val * torch.ones_like(ray_ori[..., :1])
         t = torch.linspace(0., 1., getattr(cfg, mode).num_coarse).to(ray_ori)
         # TODO: lindisp option
         z_vals = near * (1. - t) + far * t
