@@ -100,7 +100,7 @@ train:
   num_random_rays: 1024
   # Size of each chunk (rays are batched into "chunks" and passed through
   # the network)
-  chunksize: 8192  # 131072  # 1024 * 32
+  chunksize: 131072  # 1024 * 32
   # Whether or not to perturb the sampled depth values.
   perturb: True
   # Number of depth samples per ray for the coarse network.

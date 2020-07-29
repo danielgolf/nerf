@@ -138,7 +138,7 @@ class Nerf():
 
         self.opt, self.sched = None, None
         self.writer = tensorboard.writer.SummaryWriter(self.log_path)
-        self.iter = 0
+        self.iter = 1
         print('Model loaded.')
 
     def _create_embeddings(self, cfg):
