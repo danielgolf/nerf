@@ -82,6 +82,9 @@ def train(cfg):
     i_train, i_val, i_test = i_split
     H, W, focal = hwf
 
+    images = images.to(device)
+    poses = poses.to(device)
+
     # Create nerf model
     nerf = Nerf(cfg)
     nerf.to(device)
@@ -92,8 +95,8 @@ def train(cfg):
         nerf.train()    # require gradients and stuff
 
         idx = np.random.choice(i_train)
-        img = torch.from_numpy(images[idx]).to(device)
-        pose = torch.from_numpy(poses[idx]).to(device)
+        img = images[idx]
+        pose = poses[idx]
 
         coords, ray_ori, ray_dir= get_ray_bundle(
             H, W, focal, pose
@@ -158,8 +161,8 @@ def train(cfg):
                 rgb_coarse, rgb_fine = None, None
 
                 idx = np.random.choice(i_val)
-                img = torch.from_numpy(images[idx]).to(device)
-                pose = torch.from_numpy(poses[idx]).to(device)
+                img = images[idx]
+                pose = poses[idx]
 
                 _, ray_ori, ray_dir= get_ray_bundle(
                     H, W, focal, pose
