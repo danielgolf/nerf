@@ -95,6 +95,7 @@ def sample_pdf(bins, weights, num_samples, deterministic=False):
     return bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
 
 
+# TODO simplify
 def cast_to_image(tensor):
     # Input tensor is (H, W, 3). Convert to (3, H, W).
     tensor = tensor.permute(2, 0, 1)

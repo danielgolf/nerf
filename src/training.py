@@ -5,56 +5,65 @@ from tqdm import trange, tqdm
 from model import Nerf
 from dataio.loader import load_data
 from render import volume_render_radiance_field
-from utils import get_ray_bundle, sample_pdf, cast_to_image
+from utils import get_ray_bundle, sample_pdf, cast_to_image, get_minibatches
 
 
-def nerf_iteration(nerf, cfg, ray_ori, ray_dir, near, far, mode='train'):
-    # TODO NDC option
-    near = near * torch.ones_like(ray_ori[..., :1])
-    far = far * torch.ones_like(ray_ori[..., :1])
-    t = torch.linspace(0., 1., getattr(cfg, mode).num_coarse).to(ray_ori)
-    # TODO: lindisp option
-    z_vals = near * (1. - t) + far * t
-    # TODO: maybe needed?
-    # z_vals = z_vals.expand([ray_ori.shape[0], cfg.train.num_coarse])
+def nerf_iteration(nerf, cfg, rays, near, far, mode='train'):
+    batches = get_minibatches(rays, getattr(cfg, mode).chunksize)
+    coarse, fine = [], []
+    for batch in batches:
+        ray_ori, ray_dir = batch[..., :3], batch[..., 3:]
 
-    # basically eq. 2 in the paper
-    if getattr(cfg, mode).perturb:
-        mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
-        upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
-        lower = torch.cat((z_vals[..., :1], mids), dim=-1)
-        rand = torch.rand(z_vals.shape).to(z_vals)
-        z_vals = lower + (upper - lower) * rand
+        # TODO NDC option
+        near = near * torch.ones_like(ray_ori[..., :1])
+        far = far * torch.ones_like(ray_ori[..., :1])
+        t = torch.linspace(0., 1., getattr(cfg, mode).num_coarse).to(ray_ori)
+        # TODO: lindisp option
+        z_vals = near * (1. - t) + far * t
+        # TODO: maybe needed?
+        # z_vals = z_vals.expand([ray_ori.shape[0], cfg.train.num_coarse])
 
-    x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
-    out = nerf.predict(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
-
-    rgb_coarse, weights = volume_render_radiance_field(
-        out, z_vals, ray_dir,
-        getattr(cfg, mode).radiance_noise_std, getattr(cfg, mode).white_background
-    )
-
-    rgb_fine = None, None, None
-    if nerf.model_fine is not None:
-        z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
-        z_samples = sample_pdf(
-            z_vals_mid,
-            weights[..., 1:-1],
-            getattr(cfg, mode).num_fine,
-            deterministic=(getattr(cfg, mode).perturb == 0.0),
-        )
-        # TODO: needed? z_samples = z_samples.detach()
-        z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
+        # basically eq. 2 in the paper
+        if getattr(cfg, mode).perturb:
+            mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
+            upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
+            lower = torch.cat((z_vals[..., :1], mids), dim=-1)
+            rand = torch.rand(z_vals.shape).to(z_vals)
+            z_vals = lower + (upper - lower) * rand
 
         x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
         out = nerf.predict(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
 
-        rgb_fine, _ = volume_render_radiance_field(
+        rgb_coarse, weights = volume_render_radiance_field(
             out, z_vals, ray_dir,
-            getattr(cfg, mode).radiance_noise_std, getattr(cfg, mode).white_background
+            getattr(cfg, mode).radiance_noise_std,
+            getattr(cfg, mode).white_background
         )
+        coarse.append(rgb_coarse)
 
-    return rgb_coarse, rgb_fine
+        rgb_fine = None, None, None
+        if nerf.model_fine is not None:
+            z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
+            z_samples = sample_pdf(
+                z_vals_mid,
+                weights[..., 1:-1],
+                getattr(cfg, mode).num_fine,
+                deterministic=(getattr(cfg, mode).perturb == 0.0),
+            )
+            # TODO: needed? z_samples = z_samples.detach()
+            z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
+
+            x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
+            out = nerf.predict(x_xyz, ray_dir, getattr(cfg, mode).chunksize)
+
+            rgb_fine, _ = volume_render_radiance_field(
+                out, z_vals, ray_dir,
+                getattr(cfg, mode).radiance_noise_std,
+                getattr(cfg, mode).white_background
+            )
+            fine.append(rgb_fine)
+
+    return torch.cat(coarse, dim=0), torch.cat(fine, dim=0)
 
 
 def train(cfg):
@@ -76,8 +85,8 @@ def train(cfg):
     # Create nerf model
     nerf = Nerf(cfg)
     nerf.to(device)
-    nerf.create_optimizer(cfg)
     nerf.load()
+    nerf.create_optimizer(cfg)
 
     for i in trange(nerf.iter, cfg.train.iters):
         nerf.train()    # require gradients and stuff
@@ -89,10 +98,6 @@ def train(cfg):
         coords, ray_ori, ray_dir= get_ray_bundle(
             H, W, focal, pose
         )
-
-        # TODO remove, debugging concerns
-        ii, jj = torch.meshgrid(torch.arange(H).to(device), torch.arange(W).to(device))
-        coords = torch.stack([ii.T, jj.T], dim=-1).reshape((-1, 2))
 
         ray_idx = np.random.choice( # take a subset of all rays
             coords.shape[0],
@@ -108,8 +113,7 @@ def train(cfg):
         rgb_coarse, rgb_fine = nerf_iteration(
             nerf,
             cfg,
-            ray_ori,
-            ray_dir,
+            torch.cat([ray_ori, ray_dir], dim=-1),
             near,
             far
         )
@@ -146,7 +150,6 @@ def train(cfg):
         if rgb_fine is not None:
             nerf.writer.add_scalar("train/fine_loss", fine_loss.item(), i)
 
-        continue # TODO validation needs to much memory
         validA = i % cfg.validation.every
         if validA or printB:
             tqdm.write(f"[VAL] ===> Iter: {i}")
@@ -165,12 +168,10 @@ def train(cfg):
                 ray_ori = ray_ori.reshape((-1, ray_ori.shape[-1]))
                 ray_dir = ray_dir.reshape((-1, ray_dir.shape[-1]))
 
-                # TODO batchify this
                 rgb_coarse, rgb_fine = nerf_iteration(
                     nerf,
                     cfg,
-                    ray_ori,
-                    ray_dir,
+                    torch.cat([ray_ori, ray_dir], dim=-1),
                     near,
                     far,
                     mode="validation"
@@ -210,5 +211,4 @@ def train(cfg):
                                       fine_loss.item(), i)
 
                 tqdm.write(f"[VALID] Iter: {i} Loss: {loss.item()}")
-
     print("Done!")

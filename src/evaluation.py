@@ -47,12 +47,10 @@ def evalnerf(cfg):
             ray_ori = ray_ori.reshape((-1, ray_ori.shape[-1]))
             ray_dir = ray_dir.reshape((-1, ray_dir.shape[-1]))
 
-            # TODO: batchify
             rgb_coarse, rgb_fine = nerf_iteration(
                 nerf,
                 cfg,
-                ray_ori,
-                ray_dir,
+                torch.cat([ray_ori, ray_dir], dim=-1),
                 near,
                 far,
                 mode='validation'
