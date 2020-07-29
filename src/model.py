@@ -88,7 +88,6 @@ class Nerf():
         self.dim_xyz_fine, self.dim_dir_fine = None, None
         self._create_embeddings(cfg)
 
-        self.skips = [4]
         self.model_coarse = NerfMLP(
             num_layers=cfg.model.coarse.num_layers,
             num_neurons=cfg.model.coarse.num_neurons,
