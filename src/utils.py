@@ -42,52 +42,41 @@ def cumprod_exclusive(tensor):
 
 
 # TODO understand and rewrite
-def gather_cdf_util(cdf, inds):
-    orig_inds_shape = inds.shape
-    inds_flat = [inds[i].view(-1) for i in range(inds.shape[0])]
-    valid_mask = [
-        torch.where(ind >= cdf.shape[1], torch.zeros_like(
-            ind), torch.ones_like(ind))
-        for ind in inds_flat
-    ]
-    inds_flat = [
-        torch.where(
-            ind >= cdf.shape[1], (cdf.shape[1] - 1) * torch.ones_like(ind), ind)
-        for ind in inds_flat
-    ]
-    cdf_flat = [cdf[i][ind] for i, ind in enumerate(inds_flat)]
-    cdf_flat = [cdf_flat[i] * valid_mask[i] for i in range(len(cdf_flat))]
-    cdf_flat = [
-        cdf_chunk.reshape([1] + list(orig_inds_shape[1:])) for cdf_chunk in cdf_flat
-    ]
-    return torch.cat(cdf_flat, dim=0)
-
-
-# TODO understand and rewrite
-def sample_pdf(bins, weights, num_samples, deterministic=False):
-    weights = weights + 1e-5  # prevent nans
-    pdf = weights / weights.sum(-1).unsqueeze(-1)
-    cdf = torch.cumsum(pdf, -1)
-    cdf = torch.cat((torch.zeros_like(cdf[..., :1]), cdf), -1)
+def sample_pdf(bins, weights, num_samples, det=False):
+    """
+    by yenchenlin (https://github.com/yenchenlin/nerf-pytorch).
+    """
+    weights = weights + 1e-5
+    pdf = weights / torch.sum(weights, dim=-1, keepdim=True)
+    cdf = torch.cumsum(pdf, dim=-1)
+    cdf = torch.cat(
+        [torch.zeros_like(cdf[..., :1]), cdf], dim=-1
+    )  # (batchsize, len(bins))
 
     # Take uniform samples
-    if deterministic:
-        u = torch.linspace(0.0, 1.0, num_samples).to(weights)
+    if det:
+        u = torch.linspace(
+            0.0, 1.0, steps=num_samples, dtype=weights.dtype, device=weights.device
+        )
         u = u.expand(list(cdf.shape[:-1]) + [num_samples])
     else:
-        u = torch.rand(list(cdf.shape[:-1]) + [num_samples]).to(weights)
+        u = torch.rand(
+            list(cdf.shape[:-1]) + [num_samples],
+            dtype=weights.dtype,
+            device=weights.device,
+        )
 
     # Invert CDF
-    inds = torchsearchsorted.searchsorted(
-        cdf.contiguous(), u.contiguous(), side="right"
-    )
-
-    below = torch.max(torch.zeros_like(inds), inds - 1)
+    u = u.contiguous()
+    cdf = cdf.contiguous()
+    inds = torchsearchsorted.searchsorted(cdf, u, side="right")
+    below = torch.max(torch.zeros_like(inds - 1), inds - 1)
     above = torch.min((cdf.shape[-1] - 1) * torch.ones_like(inds), inds)
-    inds_g = torch.stack((below, above), -1)
+    inds_g = torch.stack((below, above), dim=-1)  # (batchsize, num_samples, 2)
 
-    cdf_g = gather_cdf_util(cdf, inds_g)
-    bins_g = gather_cdf_util(bins, inds_g)
+    matched_shape = (inds_g.shape[0], inds_g.shape[1], cdf.shape[-1])
+    cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, inds_g)
+    bins_g = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, inds_g)
 
     denom = cdf_g[..., 1] - cdf_g[..., 0]
     denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)

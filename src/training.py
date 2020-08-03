@@ -48,7 +48,7 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
                 z_vals_mid,
                 weights[..., 1:-1],
                 getattr(cfg, mode).num_fine,
-                deterministic=(getattr(cfg, mode).perturb == 0.0),
+                det=(getattr(cfg, mode).perturb == 0.0),
             )
             # TODO: needed? z_samples = z_samples.detach()
             z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
@@ -74,6 +74,14 @@ def train(cfg):
         device = "cpu"
     print(f"Running on device: {device.replace('cuda', 'gpu').upper()}")
 
+    # torch.autograd.set_detect_anomaly(True)     # debugging
+
+    # Create nerf model
+    nerf = Nerf(cfg)
+    nerf.to(device)
+    nerf.load()
+    nerf.create_optimizer(cfg)
+
     # TODO: make consistent with other data types (e.g. llff)
     # Load data
     # TODO: what do I actually need here?
@@ -84,12 +92,6 @@ def train(cfg):
 
     images = images.to(device)
     poses = poses.to(device)
-
-    # Create nerf model
-    nerf = Nerf(cfg)
-    nerf.to(device)
-    nerf.load()
-    nerf.create_optimizer(cfg)
 
     for i in trange(nerf.iter, cfg.train.iters + 1):
         nerf.train()    # require gradients and stuff
