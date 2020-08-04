@@ -50,7 +50,11 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
                 getattr(cfg, mode).num_fine,
                 det=(getattr(cfg, mode).perturb == 0.0),
             )
-            # TODO: needed? z_samples = z_samples.detach()
+
+            # important: backprop fine loss online to fine network
+            # otherwise the sampling is backpropagated to the coarse network
+            z_samples = z_samples.detach()
+
             z_vals, _ = torch.sort(torch.cat((z_vals, z_samples), dim=-1), dim=-1)
 
             x_xyz = ray_ori[..., None, :] + ray_dir[..., None, :] * z_vals[..., :, None]
