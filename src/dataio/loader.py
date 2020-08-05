@@ -34,8 +34,8 @@ class NerfData():
         quit(1)
 
     def to(self, device):
-        self.images.to(device)
-        self.poses.to(device)
+        self.poses = self.poses.to(device)
+        self.images = self.images.to(device)
 
     def get_train_batch(self, size=1024):
         idx = np.random.choice(self.i_train)
