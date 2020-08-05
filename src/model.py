@@ -11,9 +11,7 @@ def positional_encoding(x, num_freq, include_input=True):
     """
     positional encoding // kernel
     TODO: arguments mising here, but included in original implementation:
-        * include_input (True)
         * log_sampling (True)
-        * ...
     """
     freq = (x[..., None] * (2 ** torch.arange(num_freq).to(x))).view(x.shape[0], -1)
     if include_input:
@@ -21,7 +19,7 @@ def positional_encoding(x, num_freq, include_input=True):
     return torch.cat([torch.cos(freq), torch.sin(freq)], dim=-1)
 
 
-class NerfMLP(nn.Module):
+class MLP(nn.Module):
     def __init__(
             self,
             num_layers=8,
@@ -80,7 +78,7 @@ class NerfMLP(nn.Module):
         return torch.cat((rgb, alpha), -1)
 
 
-class Nerf():
+class NerfMLP():
     def __init__(self, cfg):
         self.embed_xyz_coarse, self.embed_dir_coarse = None, None
         self.dim_xyz_coarse, self.dim_dir_coarse = None, None
@@ -88,7 +86,7 @@ class Nerf():
         self.dim_xyz_fine, self.dim_dir_fine = None, None
         self._create_embeddings(cfg)
 
-        self.model_coarse = NerfMLP(
+        self.model_coarse = MLP(
             num_layers=cfg.model.coarse.num_layers,
             num_neurons=cfg.model.coarse.num_neurons,
             dim_xyz=self.dim_xyz_coarse,
@@ -96,7 +94,7 @@ class Nerf():
             skips=cfg.model.coarse.skip_connections
         )
 
-        self.model_fine = NerfMLP(
+        self.model_fine = MLP(
             num_layers=cfg.model.fine.num_layers,
             num_neurons=cfg.model.fine.num_neurons,
             dim_xyz=self.dim_xyz_fine,
@@ -179,6 +177,7 @@ class Nerf():
         self.opt.load_state_dict(checkpoint['opt'])
         self.sched.load_state_dict(checkpoint['sched'])
         self.iter = checkpoint['iter']
+        print('Checkpoint loaded.')
 
     def save(self):
         checkpoint = {

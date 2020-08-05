@@ -1,27 +1,8 @@
 import torch
-import torchvision
 import numpy as np
+from torchvision.transforms.functional import to_pil_image
 
 import torchsearchsorted
-
-
-def get_ray_bundle(height, width, focal_length, tform_cam2world):
-    ii, jj = torch.meshgrid(
-        torch.arange(width).to(tform_cam2world),
-        torch.arange(height).to(tform_cam2world)
-    )
-    xx, yy = ii.T, jj.T
-    directions = torch.stack([
-        (xx - width * 0.5) / focal_length,
-        -(yy - height * 0.5) / focal_length,
-        -torch.ones_like(xx),
-    ], -1)
-    ray_directions = torch.sum(
-        directions[..., None, :] * tform_cam2world[:3, :3], dim=-1
-    )
-    ray_origins = tform_cam2world[:3, -1].expand(ray_directions.shape)
-    coords = torch.stack([yy, xx], -1).to(torch.int64).reshape(-1, 2)
-    return coords, ray_origins, ray_directions
 
 
 def get_minibatches(inputs, chunksize=8192):
@@ -69,7 +50,10 @@ def sample_pdf(bins, weights, num_samples, det=False):
     # Invert CDF
     u = u.contiguous()
     cdf = cdf.contiguous()
+
+    # TODO what does that?
     inds = torchsearchsorted.searchsorted(cdf, u, side="right")
+
     below = torch.max(torch.zeros_like(inds - 1), inds - 1)
     above = torch.min((cdf.shape[-1] - 1) * torch.ones_like(inds), inds)
     inds_g = torch.stack((below, above), dim=-1)  # (batchsize, num_samples, 2)
@@ -84,12 +68,10 @@ def sample_pdf(bins, weights, num_samples, det=False):
     return bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
 
 
-# TODO simplify
 def cast_to_image(tensor):
     # Input tensor is (H, W, 3). Convert to (3, H, W).
-    tensor = tensor.permute(2, 0, 1)
     # Conver to PIL Image and then np.array (output shape: (H, W, 3))
-    img = np.array(torchvision.transforms.ToPILImage()(tensor.detach().cpu()))
+    img = np.array(to_pil_image(tensor.permute(2, 0, 1).cpu()))
     # Map back to shape (3, H, W), as tensorboard needs channels first.
     img = np.moveaxis(img, [-1], [0])
     return img
