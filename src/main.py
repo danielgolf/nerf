@@ -64,6 +64,7 @@ def evaluation(cfg, mlp, data):
 
 
 def train(cfg, mlp, data):
+    train_losses = []
     for i in trange(mlp.iter, cfg.train.iters + 1):
         mlp.train()    # require gradients and stuff
 
@@ -103,6 +104,7 @@ def train(cfg, mlp, data):
             mlp.save()
             tqdm.write("=== Saved Checkpoint ===")
 
+        train_losses.append(loss.item())
         mlp.writer.add_scalar("train/loss", loss.item(), i)
         mlp.writer.add_scalar("train/coarse_loss", coarse_loss.item(), i)
         mlp.writer.add_scalar("train/lr", mlp.sched.get_last_lr()[0], i)
@@ -140,6 +142,11 @@ def train(cfg, mlp, data):
 
                 loss = coarse_loss + fine_loss
 
+                mlp.writer.add_scalars("both/loss", {
+                    "train": sum(train_losses) / len(train_losses),
+                    "valid": loss.item()
+                })
+                train_losses = []
                 mlp.writer.add_scalar("validation/loss", loss.item(), i)
                 mlp.writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)
                 mlp.writer.add_image(
