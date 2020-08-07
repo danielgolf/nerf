@@ -35,8 +35,6 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
         t = torch.linspace(0., 1., getattr(cfg, mode).num_coarse).to(ray_ori)
         # TODO: lindisp option
         z_vals = near * (1. - t) + far * t
-        # TODO: maybe needed?
-        # z_vals = z_vals.expand([ray_ori.shape[0], cfg.train.num_coarse])
 
         # basically eq. 2 in the paper
         if getattr(cfg, mode).perturb:

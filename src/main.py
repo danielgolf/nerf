@@ -142,10 +142,10 @@ def train(cfg, mlp, data):
 
                 loss = coarse_loss + fine_loss
 
-                mlp.writer.add_scalars("both/loss", {
+                mlp.writer.add_scalars("both", {
                     "train": sum(train_losses) / len(train_losses),
                     "valid": loss.item()
-                })
+                }, i)
                 train_losses = []
                 mlp.writer.add_scalar("validation/loss", loss.item(), i)
                 mlp.writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)

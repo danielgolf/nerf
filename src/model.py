@@ -9,9 +9,7 @@ from utils import get_minibatches
 
 def positional_encoding(x, num_freq, include_input=True):
     """
-    positional encoding // kernel
-    TODO: arguments mising here, but included in original implementation:
-        * log_sampling (True)
+    positional encoding
     """
     freq = (x[..., None] * (2 ** torch.arange(num_freq).to(x))).view(x.shape[0], -1)
     if include_input:
