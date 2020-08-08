@@ -36,7 +36,8 @@ def evaluation(cfg, mlp, data):
     os.makedirs(save_dir, exist_ok=True)
 
     with torch.no_grad():
-        for i, pose in enumerate(tqdm(data.render_poses)):
+        for i in trange(data.render_poses.shape[0]):
+            pose = data.render_poses[i]
             _, ray_ori, ray_dir = get_ray_bundle(
                 data.height, data.width, data.focal, pose
             )
@@ -190,12 +191,12 @@ def main(cfg):
 
     # Load data
     data = NerfData(cfg)
-    data.to(device)
-
     if cfg.render_only:
+        data.render_poses = data.render_poses.to(device)
         evaluation(cfg, mlp, data)
         return
 
+    data.to(device)
     train(cfg, mlp, data)
 
 
