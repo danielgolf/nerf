@@ -17,9 +17,12 @@ def setup_dirs(cfg):
     logdir = cfg.experiment.logdir
     os.makedirs(os.path.join(logdir, expid), exist_ok=True)
 
+    with open(cfg.configuration_path, 'r') as fp:
+        configstring = fp.read()
+
     fname = os.path.join(logdir, expid, 'config.yml')
     with open(fname, 'w') as fp:
-        fp.write(open(cfg.configuration_path, 'r').read())
+        fp.write(configstring)
 
 
 def fix_seed(seed):
