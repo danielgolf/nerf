@@ -13,28 +13,28 @@ def translate_along_z(t):
     return tform
 
 
-def rotate_along_x(phi=pi):
+def rotate_along_x(phi=1.):
     phi = torch.Tensor([phi])
     tform = torch.eye(4)
     tform[1, 1] = tform[2, 2] = torch.cos(phi)
-    tform[1, 2] = torch.sin(phi)
-    tform[2, 1] = -tform[1, 2]
+    tform[2, 1] = torch.sin(phi)
+    tform[1, 2] = -tform[2, 1]
     return tform
 
 
-def rotate_along_y(theta=pi):
+def rotate_along_y(theta=1.):
     theta = torch.Tensor([theta])
     tform = torch.eye(4)
     tform[0, 0] = tform[2, 2] = torch.cos(theta)
-    tform[0, 2] = torch.sin(theta)
-    tform[2, 0] = -tform[0, 2]
+    tform[2, 0] = torch.sin(theta)
+    tform[0, 2] = -tform[2, 0]
     return tform
 
 
 def pose_spherical(theta, phi, radius):
     c2w = translate_along_z(radius)
-    c2w = rotate_along_x(phi * pi / 180.0).matmul(c2w)
-    c2w = rotate_along_y(theta * pi / 180.0).matmul(c2w)
+    c2w = rotate_along_x(phi * pi / 180.).matmul(c2w)
+    c2w = rotate_along_y(theta * pi / 180.).matmul(c2w)
     c2w = torch.Tensor([
         [-1, 0, 0, 0],
         [0, 0, 1, 0],
@@ -87,8 +87,8 @@ def load(cfg):
     focal = .5 * W / torch.tan(torch.Tensor([.5 * camera_angle_x]))[0]
 
     render_poses = torch.stack([
-        pose_spherical(angle, -30.0, 4.0)
-        for angle in torch.linspace(-180, 180, 41)[:-1]
+        pose_spherical(angle, -30., 4.)
+        for angle in torch.linspace(-180., 180., 41)[:-1]
     ], dim=0)
 
     if cfg.train.white_background:
