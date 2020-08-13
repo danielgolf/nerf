@@ -84,7 +84,8 @@ def load(cfg):
 
     H, W = imgs.shape[1:3]
     camera_angle_x = float(meta['camera_angle_x'])
-    focal = .5 * W / torch.tan(torch.Tensor([.5 * camera_angle_x]))[0]
+    focal = .5 * W / torch.tan(torch.Tensor([.5 * camera_angle_x]))
+    hwf = [int(H), int(W), focal.numpy()[0]]
 
     render_poses = torch.stack([
         pose_spherical(angle, -30., 4.)
@@ -95,8 +96,6 @@ def load(cfg):
         imgs = imgs[..., :3] * imgs[..., -1:] + (1. - imgs[..., -1:])
     else:
         imgs = imgs[..., :3]
-
-    hwf = [int(H), int(W), focal]
 
     print(
         'Loaded blender',
