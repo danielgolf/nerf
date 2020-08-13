@@ -1,18 +1,18 @@
 # Parameters to setup experiment.
 experiment:
   # Unique experiment identifier
-  id: lego
+  id: mic
   # Experiment logs will be stored at "logdir"/"id"
   logdir: logs
   # Seed for random number generators (for repeatability).
-  random_seed: 39
+  random_seed: 12
 
 # Dataset parameters.
 dataset:
   # Type of dataset (Blender vs LLFF vs DeepVoxels vs something else)
   type: blender
   # Path to dataset.
-  path: data/nerf_synthetic/lego
+  path: data/mic
   # For the Blender datasets (synthetic), optionally return images
   # at half the original resolution of 800 x 800, to save space.
   half_res: True
@@ -90,7 +90,7 @@ train:
     # Rate at which to apply this decay.
     lr_decay_factor: 0.1
   # Number of training iterations.
-  iters: 150000
+  iters: 50000
   # Number of training iterations after which to checkpoint.
   save_every: 2500
   # Number of training iterations after which to print progress.
