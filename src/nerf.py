@@ -54,7 +54,6 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
         )
         coarse.append(rgb_coarse)
 
-        rgb_fine = None, None, None
         if nerf.model_fine is not None:
             z_vals_mid = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
             z_samples = sample_pdf(
@@ -80,4 +79,6 @@ def nerf_iteration(nerf, cfg, rays, near_val, far_val, mode='train'):
             )
             fine.append(rgb_fine)
 
+    if nerf.model_fine is None:
+        return torch.cat(coarse, dim=0), None
     return torch.cat(coarse, dim=0), torch.cat(fine, dim=0)
